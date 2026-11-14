@@ -5,7 +5,7 @@ A custom 4-layer PCB designed in KiCad for smart agriculture and ground-to-orbit
 
 ### 🔗 NASA Space Apps Challenge — Quick Links
 **🌐 Live Ground-to-Orbit Dashboard:** [Open Interactive Dashboard](https://tashfeen-electronics.github.io/NASA-SPACE-APP/)
-**📊 7-Slide Pitch Deck:** [View Presentation PDF](https://github.com/tashfeen-electronics/NASA-SPACE-APP/blob/main/SmartAgri%20Node%20%E2%80%94%20NASA%20Space%20Apps%20Challenge.pptx)
+**📊 7-Slide Pitch Deck:** [View Live Presentation](https://view.officeapps.live.com/op/view.aspx?src=https://raw.githubusercontent.com/tashfeen-electronics/NASA-SPACE-APP/main/SmartAgri%20Node%20%E2%80%94%20NASA%20Space%20Apps%20Challenge.pptx)
 * **🛠️ Hardware Design Files:** [`ESP32 Project/`](ESP32%20Project/) (KiCad Schematic, 4-Layer PCB Layout & BOM)
 
 ---

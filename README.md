@@ -4,7 +4,7 @@
 A custom 4-layer PCB designed in KiCad for smart agriculture and ground-to-orbit environmental data logging — built around the **ESP32-C3-WROOM-02-H4**, with onboard sensing, local microSD storage, off-grid solar/LiPo power-path management, and **NASA POWER** satellite data fusion.
 
 ### 🔗 NASA Space Apps Challenge — Quick Links
-**🌐 Live Ground-to-Orbit Dashboard:** [Open Interactive Dashboard]([https://tashfeen-electronics.github.io/--SmartAgri-Node---The-All-in-One-Environmental-Intelligence-Board--ESP32-C3-/](https://tashfeen-electronics.github.io/NASA-SPACE-APP/))
+**🌐 Live Ground-to-Orbit Dashboard:** [Open Interactive Dashboard](https://tashfeen-electronics.github.io/NASA-SPACE-APP/)
 **📊 7-Slide Pitch Deck:** [View Presentation PDF](https://github.com/tashfeen-electronics/NASA-SPACE-APP/blob/main/SmartAgri%20Node%20%E2%80%94%20NASA%20Space%20Apps%20Challenge.pptx)
 * **🛠️ Hardware Design Files:** [`ESP32 Project/`](ESP32%20Project/) (KiCad Schematic, 4-Layer PCB Layout & BOM)
 

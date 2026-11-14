@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartAgri Node — Ground-to-Orbit Environmental Intelligence</title>
+  <!-- Fonts: Space Grotesk (Headings), Inter (UI), JetBrains Mono (Telemetry & Coordinates) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Space Grotesk', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            slate: {
+              950: '#060b14',
+              900: '#0b1220',
+              850: '#101a2e',
+              800: '#162238',
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <!-- Chart.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    body {
+      background-color: #060b14;
+      background-image:
+        radial-gradient(circle at 15% 15%, rgba(16, 185, 129, 0.06) 0%, transparent 38%),
+        radial-gradient(circle at 85% 10%, rgba(6, 182, 212, 0.07) 0%, transparent 40%),
+        linear-gradient(rgba(30, 41, 59, 0.22) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30, 41, 59, 0.22) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+    }
+    .uart-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .uart-scroll::-webkit-scrollbar-track {
+      background: #060b14;
+    }
+    .uart-scroll::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+    .uart-scroll::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+    @keyframes radarSweep {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .radar-sweep {
+      transform-origin: 110px 110px;
+      animation: radarSweep 6s linear infinite;
+    }
+  </style>
+</head>
+<body class="text-slate-100 antialiased min-h-screen selection:bg-emerald-500/30 selection:text-emerald-200">
+  <!-- Non-blocking Toast Notification Banner -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Main Container -->
+  <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <!-- SECTION 1: HEADER & DATA SOURCE LEGEND -->
+    <header class="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-2xl">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-5 border-b border-slate-800">
+        <div class="space-y-1.5">
+          <div class="flex flex-wrap items-center gap-2.5">
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider uppercase bg-cyan-950/90 text-cyan-300 border border-cyan-500/40 shadow-sm">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+              NASA Space Apps Challenge
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono text-slate-300 bg-slate-800/90 border border-slate-700">
+              4-Layer KiCad PCB • Rev 1.0
+            </span>
+          </div>
+          <h1 class="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white">
+            SmartAgri Node <span class="text-emerald-400">—</span> <span class="bg-gradient-to-r from-emerald-300 via-cyan-300 to-sky-300 bg-clip-text text-transparent">Ground-to-Orbit Environmental Intelligence</span>
+          </h1>
+          <p class="text-sm text-slate-400 max-w-3xl">
+            Real-time edge environmental sensing fused with NASA Earth observations to downscale satellite agroclimatology into actionable field irrigation and crop resilience alerts.
+          </p>
+        </div>
+
+        <!-- Global Telemetry Clock & Node Uptime -->
+        <div class="flex flex-row lg:flex-col items-center lg:items-end justify-between gap-2 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-3 shrink-0">
+          <div class="text-xs font-mono text-slate-400 uppercase tracking-wider">UTC TELEMETRY SYNC</div>
+          <div id="utc-clock" class="font-mono text-base sm:text-lg font-bold text-cyan-300">--:--:-- UTC</div>
+          <div class="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>FW v1.4.2 • Wi-Fi + SD Ready</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Color-Coded Data Source Legend Badges -->
+      <div class="pt-4">
+        <div class="text-[11px] font-mono uppercase tracking-widest text-slate-400 mb-2.5">
+          Telemetry Provenance &amp; Data Source Legend
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <!-- Badge 1: LOCAL EDGE TELEMETRY -->
+          <div class="flex items-start gap-3 p-3 rounded-xl bg-emerald-950/35 border border-emerald-500/35">
+            <span class="mt-0.5 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 shrink-0">
+              [LOCAL EDGE TELEMETRY]
+            </span>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              SmartAgri Node PCB (<span class="font-mono text-emerald-300">ESP32-C3-WROOM-02-H4</span> • BME280 • TEMT6000 • MAX4466 • MCP73871)
+            </p>
+          </div>
+
+          <!-- Badge 2: NASA EARTH OBSERVATIONS -->
+          <div class="flex items-start gap-3 p-3 rounded-xl bg-cyan-950/35 border border-cyan-500/35">
+            <span class="mt-0.5 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shrink-0">
+              [NASA EARTH OBSERVATIONS]
+            </span>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              NASA POWER Agroclimatology API (<span class="font-mono text-cyan-300">MERRA-2 / GPM</span> 0.5° × 0.625° Grid)
+            </p>
+          </div>
+
+          <!-- Badge 3: GROUND-TRUTH FUSION -->
+          <div class="flex items-start gap-3 p-3 rounded-xl bg-amber-950/35 border border-amber-500/35">
+            <span class="mt-0.5 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40 shrink-0">
+              [GROUND-TRUTH FUSION]
+            </span>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Local vs. Satellite Calibration Delta (<span class="font-mono text-amber-300">ΔT &amp; Soil Downscaling</span>)
+            </p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- SECTION 2: LOCATION INFORMATION PANEL -->
+    <section aria-labelledby="section-location-heading" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div>
+          <span class="text-xs font-mono font-bold uppercase tracking-wider text-cyan-400">01 // GEOSPATIAL DEPLOYMENT CONTEXT</span>
+          <h2 id="section-location-heading" class="font-display text-xl font-bold text-white mt-0.5">
+            Location Information &amp; Satellite Grid Alignment
+          </h2>
+        </div>
+        <button id="btn-sync-nasa" type="button" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 text-slate-950 font-semibold text-sm transition cursor-pointer shadow-lg shadow-cyan-500/20">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>Sync NASA Grid &amp; Node</span>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <!-- Left Controls (7 cols) -->
+        <div class="lg:col-span-7 flex flex-col justify-between gap-4 bg-slate-950/75 border border-slate-800/90 rounded-xl p-4 sm:p-5">
+          <div>
+            <label for="location-preset" class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-2">
+              Deployment Preset Sector
+            </label>
+            <select id="location-preset" class="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 rounded-xl px-3.5 py-2.5 text-sm font-medium text-white outline-none transition">
+              <option value="thatta">Thatta Farm Sector, Sindh — 24.7461°N, 67.9243°E</option>
+              <option value="multan">Multan Agro-Belt, Punjab — 30.1575°N, 71.5249°E</option>
+              <option value="quetta">Quetta Orchard Valley, Balochistan — 30.1798°N, 66.9750°E</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label for="input-lat" class="block text-[11px] font-mono uppercase text-slate-400 mb-1">Latitude (°N)</label>
+              <input id="input-lat" type="number" step="0.0001" value="24.7461" class="w-full bg-slate-900 border border-slate-700 focus:border-emerald-400 rounded-xl px-3 py-2 font-mono text-sm text-emerald-300 outline-none" />
+            </div>
+            <div>
+              <label for="input-lon" class="block text-[11px] font-mono uppercase text-slate-400 mb-1">Longitude (°E)</label>
+              <input id="input-lon" type="number" step="0.0001" value="67.9243" class="w-full bg-slate-900 border border-slate-700 focus:border-emerald-400 rounded-xl px-3 py-2 font-mono text-sm text-emerald-300 outline-none" />
+            </div>
+            <div>
+              <label for="input-elev" class="block text-[11px] font-mono uppercase text-slate-400 mb-1">Elevation (m)</label>
+              <input id="input-elev" type="number" step="1" value="12" class="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 font-mono text-sm text-cyan-300 outline-none" />
+            </div>
+            <div>
+              <label for="input-node-id" class="block text-[11px] font-mono uppercase text-slate-400 mb-1">Node ID</label>
+              <input id="input-node-id" type="text" value="SAN-PK-01" class="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl px-3 py-2 font-mono text-sm font-bold text-amber-300 outline-none" />
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs font-mono text-slate-400">
+            <div>
+              Active Sector: <span id="active-sector-label" class="text-slate-200 font-semibold">Thatta Farm Sector, Sindh</span>
+            </div>
+            <div>
+              NASA Grid Cell: <span id="nasa-grid-cell" class="text-cyan-300">24.50°N–25.00°N, 67.50°E–68.125°E</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Visual Coordinate Grid / Radar Preview Card (5 cols) -->
+        <div class="lg:col-span-5 bg-slate-950/90 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
+          <div class="relative w-[170px] h-[170px] sm:w-[190px] sm:h-[190px] shrink-0 mx-auto sm:mx-0">
+            <svg viewBox="0 0 220 220" class="w-full h-full rounded-xl bg-slate-900 border border-slate-800">
+              <defs>
+                <radialGradient id="radarGlow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#10b981" stop-opacity="0.25" />
+                  <stop offset="100%" stop-color="#06b6d4" stop-opacity="0" />
+                </radialGradient>
+              </defs>
+              <g stroke="#1e293b" stroke-width="1">
+                <line x1="0" y1="55" x2="220" y2="55" />
+                <line x1="0" y1="110" x2="220" y2="110" />
+                <line x1="0" y1="165" x2="220" y2="165" />
+                <line x1="55" y1="0" x2="55" y2="220" />
+                <line x1="110" y1="0" x2="110" y2="220" />
+                <line x1="165" y1="0" x2="165" y2="220" />
+              </g>
+              <rect x="42" y="46" width="136" height="128" rx="6" fill="rgba(6, 182, 212, 0.08)" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="5 4" />
+              <text x="48" y="39" fill="#22d3ee" font-family="JetBrains Mono, monospace" font-size="8.5" font-weight="700">NASA 0.5°×0.625° CELL</text>
+              <circle cx="110" cy="110" r="78" fill="none" stroke="#1e293b" stroke-width="1" />
+              <circle cx="110" cy="110" r="46" fill="none" stroke="#1e293b" stroke-width="1" />
+              <circle cx="110" cy="110" r="90" fill="url(#radarGlow)" />
+              <g class="radar-sweep">
+                <line x1="110" y1="110" x2="110" y2="22" stroke="#10b981" stroke-width="1.5" stroke-opacity="0.65" />
+              </g>
+              <g id="radar-node-marker" transform="translate(118, 102)">
+                <circle cx="0" cy="0" r="11" fill="#10b981" fill-opacity="0.22" />
+                <circle cx="0" cy="0" r="4.5" fill="#10b981" stroke="#ecfdf5" stroke-width="1.5" />
+                <text x="8" y="-6" fill="#6ee7b7" font-family="JetBrains Mono, monospace" font-size="9" font-weight="700" id="radar-node-label">SAN-PK-01</text>
+              </g>
+            </svg>
+          </div>
+
+          <div class="flex-1 space-y-2.5 min-w-0">
+            <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/30 text-[10px] font-mono text-cyan-300">
+              SUB-PIXEL GROUND TRUTH
+            </div>
+            <h3 class="font-display text-sm font-bold text-white leading-snug">
+              Spatial Downscaling Lock
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Pinpoints field microclimate inside NASA's coarse <span class="text-cyan-300 font-mono">~55 km</span> agroclimatology grid cell.
+            </p>
+            <div class="bg-slate-900/90 border border-slate-800 rounded-lg p-2.5 space-y-1 font-mono text-[11px]">
+              <div class="flex justify-between">
+                <span class="text-slate-400">COORDS:</span>
+                <span id="radar-coords-text" class="text-emerald-300">24.7461°N, 67.9243°E</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-400">ALTITUDE:</span>
+                <span id="radar-elev-text" class="text-slate-200">12 m ASL</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-400">GRID OFFSET:</span>
+                <span id="radar-offset-text" class="text-cyan-300">+0.01°N / +0.11°E</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: LIVE / LOCAL SENSOR MEASUREMENTS -->
+    <section aria-labelledby="section-sensors-heading" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+      <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">02 // [LOCAL EDGE TELEMETRY] — SMARTAGRI NODE PCB</span>
+            <span id="stream-status-pill" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              <span id="stream-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span id="stream-status-text">LIVE STREAM • 2.5s</span>
+            </span>
+          </div>
+          <h2 id="section-sensors-heading" class="font-display text-xl font-bold text-white mt-1">
+            Live Hardware Sensor Array &amp; Power-Path Telemetry
+          </h2>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button id="btn-toggle-stream" type="button" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono font-semibold text-slate-200 transition cursor-pointer">
+            <span id="icon-stream-toggle">⏸</span>
+            <span id="label-stream-toggle">Pause Stream</span>
+          </button>
+          <button id="btn-heatwave" type="button" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-xs font-mono font-semibold text-amber-300 transition cursor-pointer">
+            <span>🔥</span>
+            <span id="label-heatwave">Simulate Heatwave Spike</span>
+          </button>
+          <label for="csv-upload-input" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-xs font-mono font-semibold text-emerald-300 transition cursor-pointer">
+            <span>💾</span>
+            <span>Upload microSD CSV</span>
+            <input id="csv-upload-input" type="file" accept=".csv,text/csv" class="hidden" />
+          </label>
+        </div>
+      </div>
+
+      <!-- 7 Sensor Hardware Cards Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-slate-950/85 border border-slate-800 hover:border-emerald-500/40 rounded-xl p-4 flex flex-col justify-between transition">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-medium text-slate-400">Ambient Temperature</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">[BME280 • I2C]</span>
+          </div>
+          <div class="my-3 flex items-baseline justify-between">
+            <div>
+              <span id="val-temp" class="font-display text-3xl font-bold text-white">31.4</span>
+              <span class="font-mono text-sm text-emerald-400 ml-1">°C</span>
+            </div>
+            <svg id="spark-temp" class="w-24 h-8" viewBox="0 0 96 32"></svg>
+          </div>
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 border-t border-slate-800/80 pt-2">
+            <span>ADDR: 0x76</span>
+            <span id="trend-temp" class="text-emerald-400">NOMINAL</span>
+          </div>
+        </div>
+
+        <div class="bg-slate-950/85 border border-slate-800 hover:border-emerald-500/40 rounded-xl p-4 flex flex-col justify-between transition">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-medium text-slate-400">Relative Humidity</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">[BME280 • I2C]</span>
+          </div>
+          <div class="my-3 flex items-baseline justify-between">
+            <div>
+              <span id="val-hum" class="font-display text-3xl font-bold text-white">58.2</span>
+              <span class="font-mono text-sm text-cyan-400 ml-1">%</span>
+            </div>
+            <svg id="spark-hum" class="w-24 h-8" viewBox="0 0 96 32"></svg>
+          </div>
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 border-t border-slate-800/80 pt-2">
+            <span>VPD: <span id="val-vpd" class="text-slate-200">1.91 kPa</span></span>
+            <span class="text-cyan-400">HYGRO-OK</span>
+          </div>
+        </div>
+
+        <div class="bg-slate-950/85 border border-slate-800 hover:border-emerald-500/40 rounded-xl p-4 flex flex-col justify-between transition">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-medium text-slate-400">Barometric Pressure</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">[BME280 • I2C]</span>
+          </div>
+          <div class="my-3 flex items-baseline justify-between">
+            <div>
+              <span id="val-press" class="font-display text-3xl font-bold text-white">1011.8</span>
+              <span class="font-mono text-sm text-emerald-400 ml-1">hPa</span>
+            </div>
+            <svg id="spark-press" class="w-24 h-8" viewBox="0 0 96 32"></svg>
+          </div>
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 border-t border-slate-800/80 pt-2">
+            <span>QNH SEA-LVL</span>
+            <span class="text-slate-300">STABLE</span>
+          </div>
+        </div>
+
+        <div class="bg-slate-950/85 border border-slate-800 hover:border-emerald-500/40 rounded-xl p-4 flex flex-col justify-between transition">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-medium text-slate-400">Ambient Light</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">[TEMT6000 • ADC1]</span>
+          </div>
+          <div class="my-3 flex items-baseline justify-between">
+            <div>
+              <span id="val-lux" class="font-display text-3xl font-bold text-white">48,620</span>
+              <span class="font-mono text-sm text-amber-400 ml-1">lux</span>
+            </div>
+            <svg id="spark-lux" class="w-24 h-8" viewBox="0 0 96 32"></svg>
+          </div>
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 border-t border-slate-800/80 pt-2">
+            <span>GPIO0 • 12-BIT</span>
+            <span id="val-par" class="text-amber-300">PAR ~890 µmol</span>
+          </div>
+        </div>
+
+        <div class="bg-slate-950/85 border border-slate-800 hover:border-emerald-500/40 rounded-xl p-4 flex flex-col justify-between transition">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-medium text-slate-400">Acoustic Level</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">[MAX4466 • ADC1]</span>
+          </div>
+          <div class="my-3 flex items-baseline justify-between">
+            <div>
+              <span id="val-audio" class="font-display text-3xl font-bold text-white">44.6</span>
+              <span class="font-mono text-sm text-cyan-400 ml-1">dBA</span>
+            </div>
+            <svg id="spark-audio" class="w-24 h-8" viewBox="0 0 96 32"></svg>
+          </div>
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 border-t border-slate-800/80 pt-2">
+            <span>GPIO1 • MIC AMP</span>
+            <span class="text-emerald-400">NO PEST ANOMALY</span>
+          </div>
+        </div>
+
+        <div class="bg-slate-950/85 border border-slate-800 hover:border-emerald-500/40 rounded-xl p-4 flex flex-col justify-between transition">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-medium text-slate-400">Root-Zone Soil Moisture</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">[J4 External Probe]</span>
+          </div>
+          <div class="my-3 flex items-baseline justify-between">
+            <div>
+              <span id="val-soil" class="font-display text-3xl font-bold text-white">34.8</span>
+              <span class="font-mono text-sm text-emerald-400 ml-1">% VWC</span>
+            </div>
+            <svg id="spark-soil" class="w-24 h-8" viewBox="0 0 96 32"></svg>
+          </div>
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 border-t border-slate-800/80 pt-2">
+            <span>CAPACITIVE PROBE</span>
+            <span id="status-soil" class="text-emerald-400">OPTIMAL ZONE</span>
+          </div>
+        </div>
+
+        <div class="sm:col-span-2 bg-slate-950/85 border border-slate-800 hover:border-emerald-500/40 rounded-xl p-4 flex flex-col justify-between transition">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-medium text-slate-400">Battery &amp; Solar Power-Path Rail</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">[MCP73871 Power Path]</span>
+          </div>
+          <div class="my-3 grid grid-cols-3 gap-3 items-center">
+            <div>
+              <div class="text-[10px] font-mono text-slate-400">1S LIPO RAIL</div>
+              <div class="font-display text-2xl sm:text-3xl font-bold text-white">
+                <span id="val-batt">4.12</span><span class="font-mono text-sm text-emerald-400 ml-1">V</span>
+              </div>
+            </div>
+            <div>
+              <div class="text-[10px] font-mono text-slate-400">SOLAR INPUT</div>
+              <div class="font-display text-2xl sm:text-3xl font-bold text-cyan-300">
+                <span id="val-solar">5.18</span><span class="font-mono text-sm text-cyan-400 ml-1">V</span>
+              </div>
+            </div>
+            <div class="text-right">
+              <span id="val-pmic-status" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                ⚡ MPPT CHARGING
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 border-t border-slate-800/80 pt-2">
+            <span>SYS LOAD: 3.30V • ~68 mA AVG</span>
+            <span>SD BACKUP: <span id="sd-packet-count" class="text-slate-200">1,428</span> RECORDS</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CP2102N USB-UART Live Serial Console Drawer -->
+      <div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+        <button id="btn-toggle-uart" type="button" class="w-full px-4 py-2.5 bg-slate-900/90 hover:bg-slate-800/90 flex items-center justify-between text-left transition cursor-pointer">
+          <div class="flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="font-mono text-xs font-bold text-slate-200">
+              CP2102N USB-UART Bridge • Serial Telemetry Stream (115200 baud)
+            </span>
+            <span class="hidden sm:inline-block px-2 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-emerald-300">
+              ESP32-C3 JSON PACKETS
+            </span>
+          </div>
+          <span id="uart-chevron" class="font-mono text-xs text-slate-400">▼ Collapse</span>
+        </button>
+        <div id="uart-drawer-body" class="p-3.5 max-h-40 overflow-y-auto uart-scroll font-mono text-xs space-y-1.5 text-emerald-300/95 bg-[#040810]"></div>
+      </div>
+    </section>
+
+    <!-- SECTION 4: NASA HISTORICAL DATA & KPI SUMMARY -->
+    <section aria-labelledby="section-nasa-heading" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-cyan-400">03 // [NASA EARTH OBSERVATIONS] — POWER AGROCLIMATOLOGY</span>
+            <span id="nasa-api-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/40">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+              <span id="nasa-api-badge-text">SYNCING NASA POWER API...</span>
+            </span>
+          </div>
+          <h2 id="section-nasa-heading" class="font-display text-xl font-bold text-white mt-1">
+            NASA Historical Climatology &amp; Ground-Truth Anomaly KPIs
+          </h2>
+        </div>
+
+        <div class="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800 self-start">
+          <button id="btn-days-30" type="button" data-days="30" class="px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-cyan-500 text-slate-950 transition cursor-pointer">
+            Last 30 Days
+          </button>
+          <button id="btn-days-90" type="button" data-days="90" class="px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold text-slate-400 hover:text-white transition cursor-pointer">
+            Last 90 Days
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-slate-950/85 border border-slate-800 rounded-xl p-4">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="text-xs font-medium text-slate-400">Historical Mean Temp</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">[NASA POWER API]</span>
+          </div>
+          <div class="font-display text-3xl font-bold text-white">
+            <span id="kpi-mean-temp">--.-</span><span class="font-mono text-sm text-cyan-400 ml-1">°C</span>
+          </div>
+          <p class="text-[11px] font-mono text-slate-400 mt-2">PARAM: <span class="text-slate-300">T2M (2m Air Temp)</span></p>
+        </div>
+
+        <div class="bg-slate-950/85 border border-slate-800 rounded-xl p-4">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="text-xs font-medium text-slate-400">Historical Peak Temp</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">[NASA POWER API]</span>
+          </div>
+          <div class="font-display text-3xl font-bold text-white">
+            <span id="kpi-peak-temp">--.-</span><span class="font-mono text-sm text-rose-400 ml-1">°C</span>
+          </div>
+          <p class="text-[11px] font-mono text-slate-400 mt-2">PARAM: <span id="kpi-peak-date" class="text-slate-300">T2M_MAX Daily Peak</span></p>
+        </div>
+
+        <div class="bg-slate-950/85 border border-slate-800 rounded-xl p-4">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="text-xs font-medium text-slate-400">Cumulative Rainfall</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">[NASA POWER API]</span>
+          </div>
+          <div class="font-display text-3xl font-bold text-white">
+            <span id="kpi-rain-sum">--.-</span><span class="font-mono text-sm text-sky-400 ml-1">mm</span>
+          </div>
+          <p class="text-[11px] font-mono text-slate-400 mt-2">PARAM: <span class="text-slate-300">PRECTOTCORR (GPM)</span></p>
+        </div>
+
+        <div class="bg-slate-950/85 border border-amber-500/35 rounded-xl p-4">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="text-xs font-medium text-slate-300">Local vs. NASA Anomaly</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/35">[GROUND-TRUTH FUSION]</span>
+          </div>
+          <div class="font-display text-3xl font-bold text-amber-300">
+            <span id="kpi-delta-temp">+0.0</span><span class="font-mono text-sm text-amber-400 ml-1">°C (ΔT)</span>
+          </div>
+          <p class="text-[11px] font-mono text-slate-400 mt-2">BME280 LIVE − NASA T2M MEAN</p>
+        </div>
+      </div>
+
+      <!-- Automated Irrigation & Crop Adaptation Advisory Banner -->
+      <div id="advisory-banner" class="rounded-xl p-4 bg-emerald-950/40 border border-emerald-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-start gap-3">
+          <div id="advisory-icon" class="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-lg shrink-0">
+            🌱
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-xs font-mono font-bold uppercase tracking-wider text-emerald-300">
+                [GROUND-TRUTH FUSION] AUTOMATED IRRIGATION ADVISORY
+              </span>
+              <span id="advisory-severity" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-200">
+                STATUS: BALANCED
+              </span>
+            </div>
+            <p id="advisory-text" class="text-sm text-slate-200 mt-1">
+              Root-zone moisture (34.8%) and thermal delta (+0.8°C vs. NASA POWER baseline) indicate balanced evapotranspiration. Maintain standard drip schedule.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 5: TEMPERATURE AND RAINFALL GRAPHS -->
+    <section aria-labelledby="section-charts-heading" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <h2 id="section-charts-heading" class="sr-only">Temperature and Rainfall Analytics Charts</h2>
+
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+        <div class="space-y-2 mb-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-cyan-400">
+              04 // THERMAL GROUND-TRUTH COMPARISON
+            </span>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                [NASA POWER: T2M / MAX / MIN]
+              </span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                [LOCAL BME280: LIVE NODE]
+              </span>
+            </div>
+          </div>
+          <h3 class="font-display text-lg font-bold text-white">
+            Temperature Profile: NASA Historical (T2M / Max / Min) vs. SmartAgri Local Node
+          </h3>
+        </div>
+        <div class="relative w-full h-[310px] sm:h-[340px]">
+          <canvas id="tempChart"></canvas>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+        <div class="space-y-2 mb-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-sky-400">
+              05 // PRECIPITATION &amp; IRRIGATION TRIGGER
+            </span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+              [SOURCE: NASA POWER GPM Precipitation]
+            </span>
+          </div>
+          <h3 class="font-display text-lg font-bold text-white">
+            Historical Rainfall (PRECTOTCORR mm/day) &amp; Irrigation Trigger Threshold
+          </h3>
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <label for="rain-threshold-slider" class="flex items-center gap-2 text-xs font-mono text-slate-300">
+              <span>Trigger Threshold:</span>
+              <input id="rain-threshold-slider" type="range" min="1" max="20" step="0.5" value="5.0" class="w-28 accent-amber-400 cursor-pointer" />
+              <span id="rain-threshold-val" class="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+                5.0 mm/day
+              </span>
+            </label>
+            <div class="text-xs font-mono text-sky-300">
+              Window Total: <span id="chart-rain-total" class="font-bold text-white">--.- mm</span>
+            </div>
+          </div>
+        </div>
+        <div class="relative w-full h-[290px] sm:h-[315px]">
+          <canvas id="rainChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <footer class="text-center text-xs font-mono text-slate-500 pt-2 pb-6">
+      SmartAgri Node (ESP32-C3-WROOM-02-H4 • KiCad 4-Layer Open Hardware) • NASA Space Apps Challenge Ground-to-Orbit Telemetry Prototype
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const PRESETS = {
+        thatta: {
+          name: 'Thatta Farm Sector, Sindh',
+          lat: 24.7461,
+          lon: 67.9243,
+          elev: 12,
+          nodeId: 'SAN-PK-01',
+          baseTemp: 31.4,
+          baseHum: 58.2,
+          basePress: 1011.8,
+          baseLux: 48600,
+          baseAudio: 44.6,
+          baseSoil: 34.8
+        },
+        multan: {
+          name: 'Multan Agro-Belt, Punjab',
+          lat: 30.1575,
+          lon: 71.5249,
+          elev: 125,
+          nodeId: 'SAN-PK-02',
+          baseTemp: 33.8,
+          baseHum: 41.5,
+          basePress: 998.4,
+          baseLux: 54200,
+          baseAudio: 46.1,
+          baseSoil: 27.4
+        },
+        quetta: {
+          name: 'Quetta Orchard Valley, Balochistan',
+          lat: 30.1798,
+          lon: 66.9750,
+          elev: 1680,
+          nodeId: 'SAN-PK-03',
+          baseTemp: 21.6,
+          baseHum: 32.0,
+          basePress: 834.2,
+          baseLux: 61500,
+          baseAudio: 39.8,
+          baseSoil: 29.5
+        }
+      };
+
+      const state = {
+        sectorName: PRESETS.thatta.name,
+        lat: PRESETS.thatta.lat,
+        lon: PRESETS.thatta.lon,
+        elev: PRESETS.thatta.elev,
+        nodeId: PRESETS.thatta.nodeId,
+        daysWindow: 30,
+        isStreaming: true,
+        heatwaveActive: false,
+        rainThreshold: 5.0,
+        sdRecords: 1428,
+        live: {
+          temp: 31.4,
+          hum: 58.2,
+          press: 1011.8,
+          lux: 48620,
+          audio: 44.6,
+          soil: 34.8,
+          battV: 4.12,
+          solarV: 5.18
+        },
+        history: {
+          temp: [31.1, 31.2, 31.2, 31.3, 31.4, 31.3, 31.5, 31.4, 31.3, 31.4, 31.5, 31.4],
+          hum: [58.8, 58.6, 58.5, 58.4, 58.2, 58.3, 58.1, 58.2, 58.4, 58.2, 58.1, 58.2],
+          press: [1011.9, 1011.9, 1011.8, 1011.8, 1011.7, 1011.8, 1011.8, 1011.9, 1011.8, 1011.8, 1011.7, 1011.8],
+          lux: [47800, 48100, 48350, 48500, 48620, 48900, 48750, 48600, 48450, 48590, 48710, 48620],
+          audio: [43.9, 44.2, 45.1, 44.8, 44.3, 44.6, 45.0, 44.4, 44.2, 44.7, 44.9, 44.6],
+          soil: [35.0, 35.0, 34.9, 34.9, 34.8, 34.8, 34.8, 34.8, 34.7, 34.8, 34.8, 34.8]
+        },
+        nasa: {
+          dates: [],
+          t2m: [],
+          t2mMax: [],
+          t2mMin: [],
+          precip: [],
+          rh2m: [],
+          meanTemp: 30.6,
+          peakTemp: 36.8,
+          peakDate: '',
+          totalRain: 14.2,
+          isLiveApi: false
+        }
+      };
+
+      let tempChartInstance = null;
+      let rainChartInstance = null;
+      let streamIntervalId = null;
+
+      function showToast(message, tone = 'emerald') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        const colors = {
+          emerald: 'bg-slate-900/95 border-emerald-500/50 text-emerald-200',
+          cyan: 'bg-slate-900/95 border-cyan-500/50 text-cyan-200',
+          amber: 'bg-slate-900/95 border-amber-500/50 text-amber-200'
+        };
+        toast.className = `pointer-events-auto px-4 py-3 rounded-xl border shadow-2xl font-mono text-xs flex items-center gap-2.5 transition-all duration-300 ${colors[tone] || colors.emerald}`;
+        toast.innerHTML = `<span class="w-2 h-2 rounded-full bg-current shrink-0"></span><span>${message}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(8px)';
+          setTimeout(() => toast.remove(), 300);
+        }, 3600);
+      }
+
+      function updateUtcClock() {
+        const now = new Date();
+        const iso = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+        document.getElementById('utc-clock').textContent = iso;
+      }
+      setInterval(updateUtcClock, 1000);
+      updateUtcClock();
+
+      function renderSparkline(svgId, values, strokeColor) {
+        const svg = document.getElementById(svgId);
+        if (!svg || values.length < 2) return;
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const range = max - min || 1;
+        const w = 96;
+        const h = 32;
+        const pad = 3;
+
+        const points = values.map((v, idx) => {
+          const x = (idx / (values.length - 1)) * w;
+          const y = h - pad - ((v - min) / range) * (h - pad * 2);
+          return `${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+
+        svg.innerHTML = `
+          <polyline fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="${points}" />
+        `;
+      }
+
+      function updateRadarAndGridVisuals() {
+        const lat = state.lat;
+        const lon = state.lon;
+
+        const latFloor = Math.floor(lat * 2) / 2;
+        const latCeil = latFloor + 0.5;
+        const lonFloor = Math.floor(lon / 0.625) * 0.625;
+        const lonCeil = lonFloor + 0.625;
+
+        document.getElementById('nasa-grid-cell').textContent =
+          `${latFloor.toFixed(2)}°N–${latCeil.toFixed(2)}°N, ${lonFloor.toFixed(3)}°E–${lonCeil.toFixed(3)}°E`;
+        document.getElementById('active-sector-label').textContent = state.sectorName;
+        document.getElementById('radar-coords-text').textContent = `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
+        document.getElementById('radar-elev-text').textContent = `${state.elev} m ASL`;
+        document.getElementById('radar-node-label').textContent = state.nodeId;
+
+        const dLat = (lat - latFloor).toFixed(2);
+        const dLon = (lon - lonFloor).toFixed(2);
+        document.getElementById('radar-offset-text').textContent = `+${dLat}°N / +${dLon}°E`;
+
+        const fracX = Math.min(1, Math.max(0, (lon - lonFloor) / 0.625));
+        const fracY = Math.min(1, Math.max(0, 1 - (lat - latFloor) / 0.5));
+        const pinX = Math.round(52 + fracX * 116);
+        const pinY = Math.round(56 + fracY * 108);
+        const marker = document.getElementById('radar-node-marker');
+        if (marker) {
+          marker.setAttribute('transform', `translate(${pinX}, ${pinY})`);
+        }
+      }
+
+      function calculateVPD(tempC, rh) {
+        const es = 0.61078 * Math.exp((17.27 * tempC) / (tempC + 237.3));
+        const ea = es * (rh / 100);
+        return Math.max(0, es - ea);
+      }
+
+      function appendUartPacket() {
+        const drawer = document.getElementById('uart-drawer-body');
+        if (!drawer) return;
+        const ts = new Date().toISOString().substring(11, 23);
+        const packet = {
+          node: state.nodeId,
+          ts: ts,
+          bme280: {
+            t_c: Number(state.live.temp.toFixed(2)),
+            rh: Number(state.live.hum.toFixed(1)),
+            hpa: Number(state.live.press.toFixed(1))
+          },
+          adc1: {
+            lux: Math.round(state.live.lux),
+            dba: Number(state.live.audio.toFixed(1))
+          },
+          j4_soil: Number(state.live.soil.toFixed(1)),
+          mcp73871: {
+            vbat: Number(state.live.battV.toFixed(2)),
+            vsol: Number(state.live.solarV.toFixed(2))
+          }
+        };
+
+        const line = document.createElement('div');
+        line.className = 'whitespace-nowrap';
+        line.innerHTML = `<span class="text-slate-500">[${ts}]</span> <span class="text-cyan-400">UART0&gt;</span> ${JSON.stringify(packet)}`;
+        drawer.appendChild(line);
+
+        while (drawer.children.length > 25) {
+          drawer.removeChild(drawer.firstChild);
+        }
+        drawer.scrollTop = drawer.scrollHeight;
+      }
+
+      function updateSensorUI() {
+        const L = state.live;
+        document.getElementById('val-temp').textContent = L.temp.toFixed(1);
+        document.getElementById('val-hum').textContent = L.hum.toFixed(1);
+        document.getElementById('val-press').textContent = L.press.toFixed(1);
+        document.getElementById('val-lux').textContent = Math.round(L.lux).toLocaleString();
+        document.getElementById('val-audio').textContent = L.audio.toFixed(1);
+        document.getElementById('val-soil').textContent = L.soil.toFixed(1);
+        document.getElementById('val-batt').textContent = L.battV.toFixed(2);
+        document.getElementById('val-solar').textContent = L.solarV.toFixed(2);
+        document.getElementById('sd-packet-count').textContent = state.sdRecords.toLocaleString();
+
+        const vpd = calculateVPD(L.temp, L.hum);
+        document.getElementById('val-vpd').textContent = `${vpd.toFixed(2)} kPa`;
+        document.getElementById('val-par').textContent = `PAR ~${Math.round(L.lux * 0.0185)} µmol`;
+
+        const tempTrendEl = document.getElementById('trend-temp');
+        if (state.heatwaveActive || L.temp >= 37.5) {
+          tempTrendEl.textContent = 'HEAT SPIKE';
+          tempTrendEl.className = 'text-amber-400 font-bold';
+        } else {
+          tempTrendEl.textContent = 'NOMINAL';
+          tempTrendEl.className = 'text-emerald-400';
+        }
+
+        const soilStatusEl = document.getElementById('status-soil');
+        if (L.soil < 24.0) {
+          soilStatusEl.textContent = 'DEFICIT ALERT';
+          soilStatusEl.className = 'text-amber-400 font-bold';
+        } else {
+          soilStatusEl.textContent = 'OPTIMAL ZONE';
+          soilStatusEl.className = 'text-emerald-400';
+        }
+
+        renderSparkline('spark-temp', state.history.temp, state.heatwaveActive ? '#fbbf24' : '#34d399');
+        renderSparkline('spark-hum', state.history.hum, '#22d3ee');
+        renderSparkline('spark-press', state.history.press, '#34d399');
+        renderSparkline('spark-lux', state.history.lux, '#fbbf24');
+        renderSparkline('spark-audio', state.history.audio, '#38bdf8');
+        renderSparkline('spark-soil', state.history.soil, L.soil < 24 ? '#fbbf24' : '#34d399');
+
+        updateFusionKPIsAndAdvisory();
+
+        if (tempChartInstance && tempChartInstance.data.datasets[3]) {
+          tempChartInstance.data.datasets[3].data = state.nasa.dates.map(() => Number(L.temp.toFixed(2)));
+          tempChartInstance.update('none');
+        }
+      }
+
+      function stepSensorSimulation() {
+        const presetKey = document.getElementById('location-preset').value || 'thatta';
+        const base = PRESETS[presetKey] || PRESETS.thatta;
+
+        const targetTemp = state.heatwaveActive ? base.baseTemp + 8.6 : base.baseTemp;
+        const targetHum = state.heatwaveActive ? Math.max(16, base.baseHum - 22.0) : base.baseHum;
+        const targetSoil = state.heatwaveActive ? Math.max(15.5, base.baseSoil - 14.2) : base.baseSoil;
+        const targetLux = state.heatwaveActive ? base.baseLux + 24000 : base.baseLux;
+
+        state.live.temp += (targetTemp - state.live.temp) * 0.35 + (Math.random() - 0.5) * 0.35;
+        state.live.hum += (targetHum - state.live.hum) * 0.35 + (Math.random() - 0.5) * 0.6;
+        state.live.press = base.basePress - (state.elev - base.elev) * 0.11 + (Math.random() - 0.5) * 0.25;
+        state.live.lux += (targetLux - state.live.lux) * 0.35 + (Math.random() - 0.5) * 650;
+        state.live.audio = base.baseAudio + (Math.random() - 0.5) * 2.2;
+        state.live.soil += (targetSoil - state.live.soil) * 0.3 + (Math.random() - 0.5) * 0.25;
+        state.live.battV = Math.min(4.2, Math.max(3.65, 4.12 + (Math.random() - 0.5) * 0.02));
+        state.live.solarV = state.heatwaveActive ? 5.42 + (Math.random() - 0.5) * 0.05 : 5.18 + (Math.random() - 0.5) * 0.06;
+
+        state.sdRecords += 1;
+
+        const pushRoll = (arr, val) => {
+          arr.push(val);
+          if (arr.length > 16) arr.shift();
+        };
+        pushRoll(state.history.temp, state.live.temp);
+        pushRoll(state.history.hum, state.live.hum);
+        pushRoll(state.history.press, state.live.press);
+        pushRoll(state.history.lux, state.live.lux);
+        pushRoll(state.history.audio, state.live.audio);
+        pushRoll(state.history.soil, state.live.soil);
+
+        updateSensorUI();
+        appendUartPacket();
+      }
+
+      function startLiveStream() {
+        if (streamIntervalId) clearInterval(streamIntervalId);
+        streamIntervalId = setInterval(() => {
+          if (state.isStreaming) {
+            stepSensorSimulation();
+          }
+        }, 2500);
+      }
+
+      function formatDateYYYYMMDD(dateObj) {
+        const y = dateObj.getUTCFullYear();
+        const m = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(dateObj.getUTCDate()).padStart(2, '0');
+        return `${y}${m}${d}`;
+      }
+
+      function formatPrettyDate(yyyymmdd) {
+        if (!yyyymmdd || yyyymmdd.length !== 8) return yyyymmdd;
+        return `${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`;
+      }
+
+      function generateFallbackNasaData(lat, lon, elev, daysCount) {
+        const dates = [];
+        const t2m = [];
+        const t2mMax = [];
+        const t2mMin = [];
+        const precip = [];
+        const rh2m = [];
+
+        const endDate = new Date();
+        endDate.setUTCDate(endDate.getUTCDate() - 4);
+
+        const elevCooling = (elev / 1000) * 6.4;
+        const latFactor = Math.max(18, 34 - Math.abs(lat - 25) * 0.55 - elevCooling);
+
+        for (let i = daysCount - 1; i >= 0; i--) {
+          const d = new Date(endDate);
+          d.setUTCDate(endDate.getUTCDate() - i);
+          const key = formatDateYYYYMMDD(d);
+          dates.push(key);
+
+          const wave = Math.sin((i + lon) * 0.35) * 2.1 + Math.cos((i + lat) * 0.22) * 1.4;
+          const mean = Number((latFactor + wave).toFixed(1));
+          const max = Number((mean + 5.8 + Math.abs(Math.sin(i * 0.7)) * 2.2).toFixed(1));
+          const min = Number((mean - 6.1 - Math.abs(Math.cos(i * 0.5)) * 1.8).toFixed(1));
+
+          const rainTrigger = Math.sin(i * 1.37 + lat) * Math.cos(i * 0.83 + lon);
+          const rain = rainTrigger > 0.68 ? Number(((rainTrigger - 0.68) * 38).toFixed(1)) : 0.0;
+          const hum = Number(Math.min(92, Math.max(22, 48 + rain * 1.4 - wave * 2)).toFixed(1));
+
+          t2m.push(mean);
+          t2mMax.push(max);
+          t2mMin.push(min);
+          precip.push(rain);
+          rh2m.push(hum);
+        }
+
+        return { dates, t2m, t2mMax, t2mMin, precip, rh2m };
+      }
+
+      async function fetchNasaPowerData() {
+        const badgeEl = document.getElementById('nasa-api-badge');
+        const badgeText = document.getElementById('nasa-api-badge-text');
+        badgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/40';
+        badgeText.textContent = 'FETCHING NASA POWER API...';
+
+        const endObj = new Date();
+        endObj.setUTCDate(endObj.getUTCDate() - 4);
+        const startObj = new Date(endObj);
+        startObj.setUTCDate(endObj.getUTCDate() - (state.daysWindow - 1));
+
+        const startStr = formatDateYYYYMMDD(startObj);
+        const endStr = formatDateYYYYMMDD(endObj);
+
+        const url = `https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M,T2M_MAX,T2M_MIN,PRECTOTCORR,RH2M&community=AG&longitude=${state.lon.toFixed(4)}&latitude=${state.lat.toFixed(4)}&start=${startStr}&end=${endStr}&format=JSON`;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7500);
+
+        try {
+          const response = await fetch(url, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const json = await response.json();
+          const params = json?.properties?.parameter;
+          if (!params || !params.T2M) {
+            throw new Error('Malformed NASA POWER payload');
+          }
+
+          const rawDates = Object.keys(params.T2M).sort();
+          const dates = [];
+          const t2m = [];
+          const t2mMax = [];
+          const t2mMin = [];
+          const precip = [];
+          const rh2m = [];
+
+          for (const dt of rawDates) {
+            const vMean = params.T2M[dt];
+            const vMax = params.T2M_MAX?.[dt];
+            const vMin = params.T2M_MIN?.[dt];
+            const vPrec = params.PRECTOTCORR?.[dt];
+            const vRh = params.RH2M?.[dt];
+
+            if (
+              vMean !== undefined && vMean > -900 &&
+              vMax !== undefined && vMax > -900 &&
+              vMin !== undefined && vMin > -900 &&
+              vPrec !== undefined && vPrec > -900
+            ) {
+              dates.push(dt);
+              t2m.push(Number(vMean.toFixed(2)));
+              t2mMax.push(Number(vMax.toFixed(2)));
+              t2mMin.push(Number(vMin.toFixed(2)));
+              precip.push(Number(Math.max(0, vPrec).toFixed(2)));
+              rh2m.push(vRh !== undefined && vRh > -900 ? Number(vRh.toFixed(1)) : 50.0);
+            }
+          }
+
+          if (dates.length < 5) {
+            throw new Error('Insufficient non-fill NASA POWER days');
+          }
+
+          state.nasa = {
+            ...state.nasa,
+            dates,
+            t2m,
+            t2mMax,
+            t2mMin,
+            precip,
+            rh2m,
+            isLiveApi: true
+          };
+
+          badgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/40';
+          badgeText.textContent = 'LIVE NASA POWER API';
+          showToast(`Synced ${dates.length} daily records from NASA POWER API`, 'cyan');
+        } catch (err) {
+          clearTimeout(timeoutId);
+          const fb = generateFallbackNasaData(state.lat, state.lon, state.elev, state.daysWindow);
+          state.nasa = {
+            ...state.nasa,
+            ...fb,
+            isLiveApi: false
+          };
+
+          badgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40';
+          badgeText.textContent = 'OFFLINE NASA BASELINE';
+          showToast('Loaded calibrated NASA POWER offline baseline', 'amber');
+        }
+
+        computeNasaStatsAndRenderCharts();
+      }
+
+      function updateFusionKPIsAndAdvisory() {
+        const deltaT = state.live.temp - state.nasa.meanTemp;
+        const sign = deltaT >= 0 ? '+' : '';
+        const deltaEl = document.getElementById('kpi-delta-temp');
+        deltaEl.textContent = `${sign}${deltaT.toFixed(1)}`;
+
+        const banner = document.getElementById('advisory-banner');
+        const icon = document.getElementById('advisory-icon');
+        const severity = document.getElementById('advisory-severity');
+        const text = document.getElementById('advisory-text');
+
+        if (state.live.soil < 24.0 || deltaT > 4.0) {
+          banner.className = 'rounded-xl p-4 bg-amber-950/45 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+          icon.className = 'w-9 h-9 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-lg shrink-0';
+          icon.textContent = '⚠️';
+          severity.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/25 text-amber-200';
+          severity.textContent = 'ACTION: TRIGGER IRRIGATION';
+          text.textContent = `Thermal anomaly (${sign}${deltaT.toFixed(1)}°C vs. NASA T2M) and low J4 root-zone moisture (${state.live.soil.toFixed(1)}%) detected. Trigger +18 mm supplemental irrigation cycle immediately.`;
+        } else if (state.nasa.totalRain > 45.0 && state.live.soil > 38.0) {
+          banner.className = 'rounded-xl p-4 bg-cyan-950/45 border border-cyan-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+          icon.className = 'w-9 h-9 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-lg shrink-0';
+          icon.textContent = '💧';
+          severity.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/25 text-cyan-200';
+          severity.textContent = 'STATUS: HOLD IRRIGATION';
+          text.textContent = `NASA GPM cumulative precipitation (${state.nasa.totalRain.toFixed(1)} mm) and high local soil moisture (${state.live.soil.toFixed(1)}%) saturate root zone. Suspend pumps to conserve water.`;
+        } else {
+          banner.className = 'rounded-xl p-4 bg-emerald-950/40 border border-emerald-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+          icon.className = 'w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-lg shrink-0';
+          icon.textContent = '🌱';
+          severity.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-200';
+          severity.textContent = 'STATUS: BALANCED';
+          text.textContent = `Root-zone moisture (${state.live.soil.toFixed(1)}%) and thermal delta (${sign}${deltaT.toFixed(1)}°C vs. NASA POWER baseline) indicate balanced evapotranspiration. Maintain standard schedule.`;
+        }
+      }
+
+      function computeNasaStatsAndRenderCharts() {
+        const { dates, t2m, t2mMax, t2mMin, precip } = state.nasa;
+        if (!dates.length) return;
+
+        const sumTemp = t2m.reduce((acc, v) => acc + v, 0);
+        const meanTemp = sumTemp / t2m.length;
+
+        let peakTemp = -Infinity;
+        let peakIdx = 0;
+        t2mMax.forEach((v, i) => {
+          if (v > peakTemp) {
+            peakTemp = v;
+            peakIdx = i;
+          }
+        });
+
+        const totalRain = precip.reduce((acc, v) => acc + v, 0);
+
+        state.nasa.meanTemp = meanTemp;
+        state.nasa.peakTemp = peakTemp;
+        state.nasa.peakDate = dates[peakIdx];
+        state.nasa.totalRain = totalRain;
+
+        document.getElementById('kpi-mean-temp').textContent = meanTemp.toFixed(1);
+        document.getElementById('kpi-peak-temp').textContent = peakTemp.toFixed(1);
+        document.getElementById('kpi-peak-date').textContent = `PEAK ON ${formatPrettyDate(dates[peakIdx])}`;
+        document.getElementById('kpi-rain-sum').textContent = totalRain.toFixed(1);
+        document.getElementById('chart-rain-total').textContent = `${totalRain.toFixed(1)} mm`;
+
+        updateFusionKPIsAndAdvisory();
+        renderCharts();
+      }
+
+      function renderCharts() {
+        const labels = state.nasa.dates.map(formatPrettyDate);
+        const liveRefSeries = state.nasa.dates.map(() => Number(state.live.temp.toFixed(2)));
+        const thresholdSeries = state.nasa.dates.map(() => state.rainThreshold);
+
+        const tempCtx = document.getElementById('tempChart').getContext('2d');
+        if (tempChartInstance) {
+          tempChartInstance.destroy();
+        }
+        tempChartInstance = new Chart(tempCtx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'NASA T2M_MAX (°C)',
+                data: state.nasa.t2mMax,
+                borderColor: '#fb7185',
+                backgroundColor: 'rgba(251, 113, 133, 0.08)',
+                borderWidth: 1.8,
+                pointRadius: 1.5,
+                tension: 0.3
+              },
+              {
+                label: 'NASA T2M Mean (°C)',
+                data: state.nasa.t2m,
+                borderColor: '#22d3ee',
+                backgroundColor: 'rgba(34, 211, 238, 0.12)',
+                borderWidth: 2.4,
+                pointRadius: 2,
+                fill: true,
+                tension: 0.3
+              },
+              {
+                label: 'NASA T2M_MIN (°C)',
+                data: state.nasa.t2mMin,
+                borderColor: '#60a5fa',
+                backgroundColor: 'transparent',
+                borderWidth: 1.6,
+                pointRadius: 1.5,
+                tension: 0.3
+              },
+              {
+                label: 'SmartAgri BME280 Live (°C)',
+                data: liveRefSeries,
+                borderColor: '#10b981',
+                borderWidth: 2.5,
+                borderDash: [6, 5],
+                pointRadius: 0,
+                fill: false
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: {
+                labels: {
+                  color: '#cbd5e1',
+                  font: { family: 'JetBrains Mono', size: 11 },
+                  boxWidth: 14
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0b1220',
+                titleColor: '#f8fafc',
+                bodyColor: '#cbd5e1',
+                borderColor: '#1e293b',
+                borderWidth: 1,
+                titleFont: { family: 'JetBrains Mono' },
+                bodyFont: { family: 'JetBrains Mono', size: 11 }
+              }
+            },
+            scales: {
+              x: {
+                grid: { color: 'rgba(30, 41, 59, 0.5)' },
+                ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 10 }
+              },
+              y: {
+                grid: { color: 'rgba(30, 41, 59, 0.5)' },
+                ticks: {
+                  color: '#94a3b8',
+                  font: { family: 'JetBrains Mono', size: 10 },
+                  callback: (val) => `${val}°C`
+                }
+              }
+            }
+          }
+        });
+
+        const rainCtx = document.getElementById('rainChart').getContext('2d');
+        if (rainChartInstance) {
+          rainChartInstance.destroy();
+        }
+        rainChartInstance = new Chart(rainCtx, {
+          data: {
+            labels,
+            datasets: [
+              {
+                type: 'bar',
+                label: 'NASA GPM Rainfall (mm/day)',
+                data: state.nasa.precip,
+                backgroundColor: state.nasa.precip.map((v) =>
+                  v >= state.rainThreshold ? 'rgba(16, 185, 129, 0.78)' : 'rgba(56, 189, 248, 0.65)'
+                ),
+                borderColor: state.nasa.precip.map((v) =>
+                  v >= state.rainThreshold ? '#34d399' : '#38bdf8'
+                ),
+                borderWidth: 1,
+                borderRadius: 4
+              },
+              {
+                type: 'line',
+                label: `Irrigation Trigger (${state.rainThreshold.toFixed(1)} mm)`,
+                data: thresholdSeries,
+                borderColor: '#fbbf24',
+                borderWidth: 2,
+                borderDash: [6, 4],
+                pointRadius: 0,
+                fill: false
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: {
+                labels: {
+                  color: '#cbd5e1',
+                  font: { family: 'JetBrains Mono', size: 11 },
+                  boxWidth: 14
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0b1220',
+                titleColor: '#f8fafc',
+                bodyColor: '#cbd5e1',
+                borderColor: '#1e293b',
+                borderWidth: 1,
+                titleFont: { family: 'JetBrains Mono' },
+                bodyFont: { family: 'JetBrains Mono', size: 11 }
+              }
+            },
+            scales: {
+              x: {
+                grid: { color: 'rgba(30, 41, 59, 0.5)' },
+                ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 10 }
+              },
+              y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(30, 41, 59, 0.5)' },
+                ticks: {
+                  color: '#94a3b8',
+                  font: { family: 'JetBrains Mono', size: 10 },
+                  callback: (val) => `${val} mm`
+                }
+              }
+            }
+          }
+        });
+      }
+
+      function applyPreset(key) {
+        const p = PRESETS[key];
+        if (!p) return;
+        state.sectorName = p.name;
+        state.lat = p.lat;
+        state.lon = p.lon;
+        state.elev = p.elev;
+        state.nodeId = p.nodeId;
+
+        document.getElementById('input-lat').value = p.lat;
+        document.getElementById('input-lon').value = p.lon;
+        document.getElementById('input-elev').value = p.elev;
+        document.getElementById('input-node-id').value = p.nodeId;
+
+        state.live.temp = p.baseTemp;
+        state.live.hum = p.baseHum;
+        state.live.press = p.basePress;
+        state.live.lux = p.baseLux;
+        state.live.audio = p.baseAudio;
+        state.live.soil = p.baseSoil;
+
+        updateRadarAndGridVisuals();
+        updateSensorUI();
+        fetchNasaPowerData();
+      }
+
+      document.getElementById('location-preset').addEventListener('change', (e) => {
+        applyPreset(e.target.value);
+      });
+
+      document.getElementById('btn-sync-nasa').addEventListener('click', () => {
+        const latVal = parseFloat(document.getElementById('input-lat').value);
+        const lonVal = parseFloat(document.getElementById('input-lon').value);
+        const elevVal = parseFloat(document.getElementById('input-elev').value);
+        const nodeVal = document.getElementById('input-node-id').value.trim();
+
+        if (Number.isFinite(latVal) && latVal >= -90 && latVal <= 90) state.lat = latVal;
+        if (Number.isFinite(lonVal) && lonVal >= -180 && lonVal <= 180) state.lon = lonVal;
+        if (Number.isFinite(elevVal)) state.elev = elevVal;
+        if (nodeVal) state.nodeId = nodeVal;
+        state.sectorName = `Custom Field (${state.lat.toFixed(2)}°N, ${state.lon.toFixed(2)}°E)`;
+
+        updateRadarAndGridVisuals();
+        fetchNasaPowerData();
+      });
+
+      document.getElementById('btn-toggle-stream').addEventListener('click', () => {
+        state.isStreaming = !state.isStreaming;
+        const pill = document.getElementById('stream-status-pill');
+        const dot = document.getElementById('stream-dot');
+        const statusText = document.getElementById('stream-status-text');
+        const btnIcon = document.getElementById('icon-stream-toggle');
+        const btnLabel = document.getElementById('label-stream-toggle');
+
+        if (state.isStreaming) {
+          pill.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+          dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-ping';
+          statusText.textContent = 'LIVE STREAM • 2.5s';
+          btnIcon.textContent = '⏸';
+          btnLabel.textContent = 'Pause Stream';
+          showToast('Live ESP32-C3 telemetry stream resumed', 'emerald');
+        } else {
+          pill.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-slate-800 text-slate-300 border border-slate-700';
+          dot.className = 'w-2 h-2 rounded-full bg-slate-500';
+          statusText.textContent = 'STREAM PAUSED';
+          btnIcon.textContent = '▶';
+          btnLabel.textContent = 'Resume Stream';
+          showToast('Telemetry stream paused for inspection', 'amber');
+        }
+      });
+
+      document.getElementById('btn-heatwave').addEventListener('click', () => {
+        state.heatwaveActive = !state.heatwaveActive;
+        const btn = document.getElementById('btn-heatwave');
+        const lbl = document.getElementById('label-heatwave');
+
+        if (state.heatwaveActive) {
+          btn.className = 'inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500 text-slate-950 font-mono text-xs font-bold transition cursor-pointer shadow-lg shadow-amber-500/25';
+          lbl.textContent = 'Clear Heatwave Spike';
+          showToast('Simulating acute heatwave & soil moisture drop!', 'amber');
+        } else {
+          btn.className = 'inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-xs font-mono font-semibold text-amber-300 transition cursor-pointer';
+          lbl.textContent = 'Simulate Heatwave Spike';
+          showToast('Restored nominal field microclimate baseline', 'emerald');
+        }
+        stepSensorSimulation();
+      });
+
+      document.getElementById('csv-upload-input').addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const text = String(evt.target?.result || '').trim();
+            const lines = text.split(/\r?\n/).filter(Boolean);
+            if (lines.length < 2) {
+              throw new Error('CSV needs header + at least 1 data row');
+            }
+
+            const headers = lines[0].toLowerCase().split(',').map((h) => h.trim());
+            const lastCols = lines[lines.length - 1].split(',').map((c) => c.trim());
+
+            const findCol = (keywords) => headers.findIndex((h) => keywords.some((k) => h.includes(k)));
+            const idxT = findCol(['temp', 't2m', 'bme']);
+            const idxH = findCol(['hum', 'rh']);
+            const idxP = findCol(['press', 'hpa']);
+            const idxL = findCol(['lux', 'light']);
+            const idxA = findCol(['audio', 'dba', 'mic']);
+            const idxS = findCol(['soil', 'moist']);
+
+            if (idxT >= 0 && !isNaN(parseFloat(lastCols[idxT]))) state.live.temp = parseFloat(lastCols[idxT]);
+            if (idxH >= 0 && !isNaN(parseFloat(lastCols[idxH]))) state.live.hum = parseFloat(lastCols[idxH]);
+            if (idxP >= 0 && !isNaN(parseFloat(lastCols[idxP]))) state.live.press = parseFloat(lastCols[idxP]);
+            if (idxL >= 0 && !isNaN(parseFloat(lastCols[idxL]))) state.live.lux = parseFloat(lastCols[idxL]);
+            if (idxA >= 0 && !isNaN(parseFloat(lastCols[idxA]))) state.live.audio = parseFloat(lastCols[idxA]);
+            if (idxS >= 0 && !isNaN(parseFloat(lastCols[idxS]))) state.live.soil = parseFloat(lastCols[idxS]);
+
+            state.sdRecords += lines.length - 1;
+            updateSensorUI();
+            appendUartPacket();
+            showToast(`Ingested ${lines.length - 1} microSD CSV rows from "${file.name}"`, 'emerald');
+          } catch (err) {
+            showToast(`CSV parse notice: ${err.message}`, 'amber');
+          }
+          e.target.value = '';
+        };
+        reader.readAsText(file);
+      });
+
+      document.getElementById('btn-toggle-uart').addEventListener('click', () => {
+        const body = document.getElementById('uart-drawer-body');
+        const chev = document.getElementById('uart-chevron');
+        const isHidden = body.classList.toggle('hidden');
+        chev.textContent = isHidden ? '▶ Expand' : '▼ Collapse';
+      });
+
+      [document.getElementById('btn-days-30'), document.getElementById('btn-days-90')].forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const days = Number(btn.getAttribute('data-days'));
+          if (days === state.daysWindow) return;
+          state.daysWindow = days;
+
+          document.getElementById('btn-days-30').className =
+            days === 30
+              ? 'px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-cyan-500 text-slate-950 transition cursor-pointer'
+              : 'px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold text-slate-400 hover:text-white transition cursor-pointer';
+          document.getElementById('btn-days-90').className =
+            days === 90
+              ? 'px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-cyan-500 text-slate-950 transition cursor-pointer'
+              : 'px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold text-slate-400 hover:text-white transition cursor-pointer';
+
+          fetchNasaPowerData();
+        });
+      });
+
+      document.getElementById('rain-threshold-slider').addEventListener('input', (e) => {
+        state.rainThreshold = parseFloat(e.target.value);
+        document.getElementById('rain-threshold-val').textContent = `${state.rainThreshold.toFixed(1)} mm/day`;
+
+        if (rainChartInstance) {
+          rainChartInstance.data.datasets[0].backgroundColor = state.nasa.precip.map((v) =>
+            v >= state.rainThreshold ? 'rgba(16, 185, 129, 0.78)' : 'rgba(56, 189, 248, 0.65)'
+          );
+          rainChartInstance.data.datasets[0].borderColor = state.nasa.precip.map((v) =>
+            v >= state.rainThreshold ? '#34d399' : '#38bdf8'
+          );
+          rainChartInstance.data.datasets[1].label = `Irrigation Trigger (${state.rainThreshold.toFixed(1)} mm)`;
+          rainChartInstance.data.datasets[1].data = state.nasa.dates.map(() => state.rainThreshold);
+          rainChartInstance.update('none');
+        }
+      });
+
+      window.addEventListener('DOMContentLoaded', () => {
+        updateRadarAndGridVisuals();
+        updateSensorUI();
+        appendUartPacket();
+        fetchNasaPowerData();
+        startLiveStream();
+      });
+    })();
+  </script>
+</body>
+</html>
